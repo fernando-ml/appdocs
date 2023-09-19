@@ -36,8 +36,13 @@ def main():
         text = nlp(text)
         text = " ".join([token.text for token in text if token.ent_type_ not in ["PERSON", "DATE"]])
 
-        pattern = r"\b[A-Za-z]+\d+\b"
-        text = re.sub(pattern, "", text)
+        pattern1 = r'f\d+'
+        pattern2 = r"\b[A-Za-z]+\d+\b"
+        pattern3 = r'\[(.*?)\]'
+        
+        text = re.sub(pattern1, "", text)
+        text = re.sub(pattern2, "", text)
+        text = re.sub(pattern3, "", text)
         
         return text.replace("REDACTED", "").lower().replace("[Name]", "").replace("[your name]", "").\
                                 replace("dear admissions committee,", "").replace("sincerely,","").\
