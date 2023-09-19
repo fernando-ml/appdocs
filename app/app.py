@@ -152,7 +152,7 @@ def main():
                     prediction, predict_proba = nb_lr(model, text)
                     st.session_state["sklearn"] = True
                 else:
-                    prediction, predict_proba = torch_pred(tokenizer, model, text)
+                    prediction, predict_proba = torch_pred(tokenizer, model, format_text(text))
                     st.session_state["torch"] = True
 
             # Store the result in session state
@@ -182,7 +182,7 @@ def main():
                 with st.spinner('Wait for it 💭... BERT-based model explanations take around 4-10 minutes. In case you want to abort, refresh the page.'):
                 # TORCH EXPLAINER PRED FUNC (USES logits)
                     def f(x):
-                        tv = torch.tensor([tokenizer.encode(v, padding='max_length', max_length=512, truncation=True) for v in x])#.cuda()
+                        tv = torch.tensor([tokenizer.encode(v, padding='max_length', max_length=512, truncation=True) for v in x])
                         outputs = model(tv).detach().cpu().numpy()
                         scores = (np.exp(outputs).T / np.exp(outputs).sum(-1)).T
                         val = scipy.special.logit(scores[:,1]) # use one vs rest logit units
