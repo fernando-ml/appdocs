@@ -44,7 +44,7 @@ def main():
         text = re.sub(pattern2, "", text)
         text = re.sub(pattern3, "", text)
         
-        return text.replace("REDACTED", "").lower().replace("[Name]", "").replace("[your name]", "").\
+        return text.replace("REDACTED", "").lower().replace("  "," ").replace("[Name]", "").replace("[your name]", "").replace("\n your name", "").\
                                 replace("dear admissions committee,", "").replace("sincerely,","").\
                                 replace("[university's name]","fordham").replace("dear sir/madam,","").\
                                 replace("– statement of intent  ","").\
