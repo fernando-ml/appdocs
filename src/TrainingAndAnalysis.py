@@ -284,6 +284,6 @@ class MyHFModel(PreTrainedModel):
 config = MyConfig(0.55)
 Custom_HF_Model = MyHFModel(config)
 
-Custom_HF_Model.save_pretrained("HF_DistilBertBasedModelAppDocs")
+Custom_HF_Model.save_pretrained("HF_DistilBertBasedModelAppDocs2")
 
 # Bert
