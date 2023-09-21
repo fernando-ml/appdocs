@@ -113,7 +113,7 @@ def main():
     
     st.markdown('AI-generated content has reached an unprecedented level of realism. The models on this website focus on identifying AI-generated application materials, such as Statements of Intent (SOI) and Letters of Recommendation (LOR). These models were trained using real-world SOIs and LORs, alongside their AI counterparts generated through prompts crafted using information from actual applications. An example of such prompts is as follows:')
     st.markdown('''"Write a statement of intent for a master's in Data Science at Fordham University. My undergraduate degree is in Mathematics, and my GPA is 3.45. I possess proficiency in python, java, matlab, software, calculus, and linear algebra."''')
-    st.markdown("It's worth noting that these models are not trained to detect AI-enhanced text originating from human-authored drafts. Using tools like ChatGPT for document revision may be acceptable for some admissions committees, as they combine human creativity with AI language proficiency. However, our upcoming research will focus on identifying AI-modified texts, including paraphrasing, to ensure transparency and trustworthiness across various applications")
+    st.markdown("It's worth noting that these models are not trained to detect AI-enhanced text originating from human-authored drafts. Using tools like ChatGPT for document revision may be acceptable for some admissions committees, as they combine human creativity with AI language proficiency. However, our upcoming research will focus on identifying AI-modified texts, including paraphrasing, to ensure transparency and trustworthiness across various applications.")
     
     # Check the model to use
     def restore_prediction_state():
