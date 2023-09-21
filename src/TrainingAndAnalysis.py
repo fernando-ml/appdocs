@@ -16,6 +16,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from transformers import BertModel, BertTokenizer, DistilBertTokenizer, DistilBertModel, AutoModelForSequenceClassification, BertForSequenceClassification, AutoTokenizer, PreTrainedModel, PretrainedConfig
+from typing import Optional
 from eli5.lime import TextExplainer
 from eli5.lime.samplers import MaskingTextSampler
 import re
@@ -198,12 +199,6 @@ batch_size = 8
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-batch_size = 8
-
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-
-from typing import Optional
 class TransformerBasedModelDistilBert(nn.Module):
     def __init__(self):
         super(TransformerBasedModelDistilBert, self).__init__()
@@ -296,7 +291,7 @@ class MyHFModel(PreTrainedModel):
 config = MyConfig(0.55)
 Custom_HF_Model = MyHFModel(config)
 
-Custom_HF_Model.save_pretrained("HF_DistilBertBasedModelAppDocs2")
+Custom_HF_Model.save_pretrained("HF_DistilBertBasedModelAppDocs")
 
 ##########
 # Bert
@@ -339,7 +334,6 @@ class TransformerBasedModelBert(nn.Module):
         logits = self.fc(pooled_output)
         return logits
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = TransformerBasedModelBert().to(device)
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
@@ -408,6 +402,213 @@ class MyHFModel_BertBased(PreTrainedModel):
         if attention_mask is None:
             attention_mask = torch.ones(input_shape, device=device)
         return self.model(input_ids=input_ids, attention_mask=attention_mask)
+
+config = MyConfig(0.55)
+Custom_HF_Model = MyHFModel_BertBased(config)
+
+Custom_HF_Model.save_pretrained("HF_BertBasedModelAppDocs")
+
+## Training with Academic App docs + Wiki
+df_wiki = pd.read_csv("GPT-wiki-intro.csv").sample(30000)
+originals = pd.DataFrame(df_wiki["wiki_intro"]).rename({"wiki_intro": "Text"},axis=1)
+originals["Target"] = 0
+
+generated = pd.DataFrame(df_wiki["generated_intro"]).rename({"generated_intro": "Text"},axis=1)
+generated["Target"] = 1
+
+Wiki = originals.append(generated1).reset_index(drop=True)
+Wiki = Wiki.sample(len(Wiki))
+
+df_larger = df[["Text", "Target"]].append(Wiki)
+df_larger = df_larger.sample(len(df_larger))
+df_larger["Text"] = df_larger["Text"].map(lambda x: text_cleaning(x))
+df_larger = df_larger.drop_duplicates()
+df_larger.reset_index(drop=True, inplace=True)
+
+# Train Test Split
+X_train, X_test, y_train, y_test = train_test_split(df_larger.drop("Target",axis=1), df_larger.Target, train_size=0.80)
+train_sentences = X_train.Text.to_list(); test_sentences = X_test.Text.to_list()
+# Baseline models
+model_lr = Pipeline([
+                    ("tf-idf", TfidfVectorizer()),
+                    ("clf", LogisticRegression())
+])
+model_lr.fit(X=train_sentences,
+               y=y_train)
+
+model_nb = Pipeline([
+                    ("tf-idf", TfidfVectorizer()),
+                    ("clf", MultinomialNB())
+])
+model_nb.fit(X=train_sentences,
+               y=y_train)
+
+print(f"TF-IDF + LR")
+print(f"Accuracy: {model_lr.score(test_sentences, y_test)}\n")
+print(classification_report(y_test, model_lr.predict(test_sentences)),"\n")
+
+print(f"TF-IDF + NB")
+print(f"Accuracy: {model_nb.score(test_sentences, y_test)}\n")
+print(classification_report(y_test, model_nb.predict(test_sentences)))
+
+# Save baseline model
+dump(model_lr, "baseline_model_lr2.joblib");
+dump(model_nb, "baseline_model_nb2.joblib");
+
+# Transformers-based models
+
+## DistilBert
+
+tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+# Encode the text data
+train_encodings = tokenizer(train_sentences, padding='max_length', max_length=512, truncation=True)
+val_encodings = tokenizer(test_sentences, padding='max_length', max_length=512, truncation=True)
+
+# Include additional features
+columns = X_train.drop(["Text"],axis=1).columns.to_list()
+
+for column in columns:
+    train_encodings[column] = X_train[column].to_list()
+    val_encodings[column] = X_test[column].to_list()
+
+train_dataset = TextDataset(train_encodings, y_train.values)
+val_dataset = TextDataset(val_encodings, y_test.values)
+
+batch_size = 8
+
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+model = TransformerBasedModelDistilBert().to(device)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
+loss_fn = nn.CrossEntropyLoss()
+early_stopping = EarlyStopping()
+
+num_epochs = 5
+for epoch in range(num_epochs):
+    model.train()
+    train_loss = 0
+    train_total = 0
+    for batch in train_loader:
+      input_ids = batch['input_ids'].to(device)
+      attention_mask = batch['attention_mask'].to(device)
+      labels = batch['labels'].to(device)
+      logits = model(input_ids=input_ids, attention_mask=attention_mask)
+      loss = loss_fn(logits, labels)
+
+      train_loss += loss
+      train_total += labels.size(0)
+
+      optimizer.zero_grad()
+      loss.backward()
+      optimizer.step()
+
+    model.eval()
+    with torch.inference_mode():
+        correct = 0
+        test_loss = 0
+        total = 0
+        for batch in val_loader:
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['labels'].to(device)
+            logits = model(input_ids=input_ids, attention_mask=attention_mask)
+            test_loss += loss_fn(logits, labels)
+            _, predicted = torch.max(logits, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+        
+    early_stop = early_stopping(test_loss/total, model)
+    
+    if early_stop:
+        print("Early stopping")
+        break
+
+    print(f'Epoch {epoch+1} out of {num_epochs} | Train Loss: {train_loss/train_total:.6f} | Test Accuracy: {correct/total:.6f}')
+
+### best weights
+model.load_state_dict(torch.load('checkpoint.pt'))
+
+### Save as HuggingFace Model
+config = MyConfig(0.55)
+Custom_HF_Model = MyHFModel(config)
+
+Custom_HF_Model.save_pretrained("HF_DistilBertBasedModelAppDocs2")
+
+##########
+# Bert
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+# Encode the text data
+train_encodings = tokenizer(train_sentences, truncation=True, padding=True)
+val_encodings = tokenizer(test_sentences, truncation=True, padding=True)
+
+# Include additional features
+columns = X_train.drop(["Text"],axis=1).columns.to_list()
+
+for column in columns:
+    train_encodings[column] = X_train[column].to_list()
+    val_encodings[column] = X_test[column].to_list()
+
+train_dataset = TextDataset(train_encodings, y_train.values)
+val_dataset = TextDataset(val_encodings, y_test.values)
+
+batch_size = 8
+
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+model = TransformerBasedModelBert().to(device)
+
+optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
+loss_fn = nn.CrossEntropyLoss()
+early_stopping = EarlyStopping()
+
+num_epochs = 5
+for epoch in range(num_epochs):
+    model.train()
+    train_loss = 0
+    train_total = 0
+    for batch in train_loader:
+      input_ids = batch['input_ids'].to(device)
+      attention_mask = batch['attention_mask'].to(device)
+      labels = batch['labels'].to(device)
+      logits = model(input_ids=input_ids, attention_mask=attention_mask)
+      loss = loss_fn(logits, labels)
+
+      train_loss += loss
+      train_total += labels.size(0)
+
+      optimizer.zero_grad()
+      loss.backward()
+      optimizer.step()
+
+    model.eval()
+    with torch.inference_mode():
+        correct = 0
+        test_loss = 0
+        total = 0
+        for batch in val_loader:
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['labels'].to(device)
+            logits = model(input_ids=input_ids, attention_mask=attention_mask)
+            test_loss += loss_fn(logits, labels)
+            _, predicted = torch.max(logits, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+        
+    early_stop = early_stopping(test_loss/total, model)
+    
+    if early_stop:
+        print("Early stopping")
+        break
+
+    print(f'Epoch {epoch+1} out of {num_epochs} | Train Loss: {train_loss/train_total:.6f} | Test Accuracy: {correct/total:.6f}')
+
+### best weights
+model.load_state_dict(torch.load('checkpoint.pt'))
 
 config = MyConfig(0.55)
 Custom_HF_Model = MyHFModel_BertBased(config)
