@@ -72,11 +72,9 @@ def main():
     students_info = pd.read_excel("merged-data-without-TOEFL-final.xlsx")[columns_to_use]
     # Feature engineering and feature generation to add randomness and sense to the prompts
     students_info["PromptVersion"] = np.random.choice([1,2,3,4], size=len(students_info))
-    #students_info['age_at_submission'] = students_info['age_at_submission'].map(lambda x: round(x))
     students_info['undergrad1_gpa'] = students_info['undergrad1_gpa'].map(lambda x: round(x,2) if x > 3.40 else np.nan)
     students_info.replace({'Unknown':np.nan},inplace=True)
     students_info.replace({'OTHER':np.nan},inplace=True)
-    #students_info["ExplainPlease"] = np.random.choice([True, False], size=len(students_info))
     students_info["TalkAboutAge"] = np.random.choice([True, False], size=len(students_info),p=[.05,.95])
     students_info["TalkAboutRace"] = np.random.choice([True, False], size=len(students_info),p=[.2,.8])
     students_info["TalkAboutSkills"] = np.random.choice([True, False], size=len(students_info),p=[.95,.05])
