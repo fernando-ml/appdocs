@@ -90,8 +90,6 @@ def main():
     students_info["Prompt"] = students_info.apply(PromptGenerator,axis=1)
     # Format prompts the resulted prompts to generate SOI
     students_info["Prompt"] = students_info["Prompt"].map(lambda x: x.replace(empty, "")).replace("  ", " ")
-
-    students_info = students_info.iloc[:3] # Capped for Presentation Purposes to 3 < - Delete after 03/27/2023
     
     # Use OpenAI API to generate SOI
     GeneratedSOIs = []
